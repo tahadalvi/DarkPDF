@@ -1,0 +1,29 @@
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top left, rgba(56, 178, 172, 0.18), transparent 45%),
+    radial-gradient(circle at bottom right, rgba(128, 90, 213, 0.18), transparent 40%),
+    #0d1017;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rv-annotation-highlight-area {
+  border-radius: 4px;
+  background: rgba(255, 226, 62, 0.45);
+}
