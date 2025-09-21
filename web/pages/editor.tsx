@@ -220,9 +220,8 @@ export default function Editor() {
 
 
 
-  const addHighlight = useCallback((areas: HighlightArea[]) => {
-
-    if (!areas.length) return;
+  const addHighlight = useCallback((areas: HighlightArea[] | undefined) => {
+    if (!Array.isArray(areas) || areas.length === 0) return;
 
     const stamp = dayjs().valueOf();
 
@@ -689,6 +688,8 @@ export default function Editor() {
   );
 
 }
+
+
 
 
 

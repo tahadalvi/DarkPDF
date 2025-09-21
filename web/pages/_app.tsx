@@ -3,6 +3,7 @@ import { ChakraProvider, extendTheme } from '@chakra-ui/react';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 import '@react-pdf-viewer/highlight/lib/styles/index.css';
+import ErrorBoundary from '../components/ErrorBoundary';
 import '../styles/globals.css';
 
 const theme = extendTheme({
@@ -24,7 +25,8 @@ const theme = extendTheme({
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <ChakraProvider theme={theme}>
-      <Component {...pageProps} />
+      <ErrorBoundary>\r\n        <Component {...pageProps} />\r\n      </ErrorBoundary>
     </ChakraProvider>
   );
 }
+
