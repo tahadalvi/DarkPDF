@@ -8,6 +8,8 @@ from security import encrypt_pdf_bytes, unlock_pdf_bytes, strip_metadata_pdf_byt
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import ArrayObject, FloatObject, DictionaryObject, NameObject
 from watermark import add_text_watermark_pdf_bytes, add_image_watermark_pdf_bytes
+from compression import compress_pdf_bytes
+from editing import replace_text_preserving_style
 
 app = FastAPI(title="LightPDF-style API", version="0.1.0")
 
@@ -302,3 +304,59 @@ async def highlight_pdf(
 
 
 
+
+# New endpoints ----------------------------------------------------------------
+
+@app.post("/compress")
+async def compress_pdf(
+    file: UploadFile = File(...),
+):
+    """
+    Compress a PDF using pikepdf optimization. Returns a smaller PDF.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    data = await file.read()
+    try:
+        out_bytes = compress_pdf_bytes(data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Compression failed: {e}")
+    return StreamingResponse(
+        io.BytesIO(out_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=compressed-{uuid.uuid4().hex[:8]}.pdf"
+        },
+    )
+
+
+@app.post("/edit/replace_text")
+async def edit_replace_text(
+    file: UploadFile = File(...),
+    page_index: int = Form(...),
+    find_text: str = Form(...),
+    replace_text: str = Form(...),
+    fallback_font: UploadFile | None = File(None),
+):
+    """
+    Replace the first occurrence of `find_text` on the given page with `replace_text`,
+    preserving the original font family, size and color where possible. A fallback font
+    may be provided when the embedded subset font cannot be reused.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    pdf_bytes = await file.read()
+    fb_bytes = await fallback_font.read() if fallback_font else None
+    try:
+        out = replace_text_preserving_style(
+            pdf_bytes, page_index, find_text, replace_text, fb_bytes
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return StreamingResponse(
+        io.BytesIO(out),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=edited-{uuid.uuid4().hex[:8]}.pdf"
+        },
+    )
