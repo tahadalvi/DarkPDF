@@ -2,7 +2,7 @@ import dynamic from 'next/dynamic';
 
 import Head from 'next/head';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, Component, ReactNode } from 'react';
 
 import NextLink from 'next/link';
 
@@ -48,6 +48,16 @@ import {
 
   chakra,
 
+  Alert,
+
+  AlertIcon,
+
+  AlertTitle,
+
+  AlertDescription,
+
+  CloseButton,
+
 } from '@chakra-ui/react';
 
 import { highlightPlugin, HighlightArea, Trigger, type HighlightPlugin } from '@react-pdf-viewer/highlight';
@@ -69,6 +79,57 @@ const Worker = dynamic(() => import('@react-pdf-viewer/core').then((mod) => mod.
 const workerUrl = '/pdf.worker.min.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+
+
+// Error boundary to catch PDF viewer crashes
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  onError?: (error: Error) => void;
+  fallback?: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class PdfErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('PDF Viewer Error:', error);
+    this.props.onError?.(error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <Flex direction="column" align="center" justify="center" minH="400px" p={8}>
+          <Alert status="error" variant="subtle" flexDirection="column" alignItems="center" justifyContent="center" textAlign="center" borderRadius="xl" py={8}>
+            <AlertIcon boxSize="40px" mr={0} />
+            <AlertTitle mt={4} mb={1} fontSize="lg">PDF Viewer Error</AlertTitle>
+            <AlertDescription maxWidth="sm">
+              There was an issue displaying this PDF. This may happen with image-only PDFs that don&apos;t contain text layers.
+            </AlertDescription>
+            <Button mt={4} colorScheme="red" variant="outline" onClick={() => this.setState({ hasError: false, error: null })}>
+              Try Again
+            </Button>
+          </Alert>
+        </Flex>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 
 
@@ -179,6 +240,10 @@ export default function Editor() {
   const [isHighlightMode, setIsHighlightMode] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isImagePdf, setIsImagePdf] = useState(false);
+
+  const [viewerError, setViewerError] = useState<string | null>(null);
 
 
 
@@ -359,13 +424,21 @@ export default function Editor() {
 
   useEffect(() => {
 
-    highlightPluginInstance?.switchTrigger(isHighlightMode ? Trigger.TextSelection : Trigger.None);
+    // Don't enable text selection trigger for image-only PDFs
+    if (isImagePdf) {
+      highlightPluginInstance?.switchTrigger(Trigger.None);
+      if (isHighlightMode) {
+        setIsHighlightMode(false);
+      }
+    } else {
+      highlightPluginInstance?.switchTrigger(isHighlightMode ? Trigger.TextSelection : Trigger.None);
+    }
 
-  }, [highlightPluginInstance, isHighlightMode]);
+  }, [highlightPluginInstance, isHighlightMode, isImagePdf]);
 
 
 
-  const handleFiles = useCallback((files: File[]) => {
+  const handleFiles = useCallback(async (files: File[]) => {
 
     if (!files.length) return;
 
@@ -373,13 +446,47 @@ export default function Editor() {
 
     setFile(uploaded);
 
+    setViewerError(null);
+
+    setIsImagePdf(false);
+
     const url = URL.createObjectURL(uploaded);
 
     setViewerUrl(url);
 
     setHighlights([]);
 
-  }, []);
+    // Check if PDF has text content (to detect image-only PDFs)
+    try {
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+      const arrayBuffer = await uploaded.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let hasText = false;
+      // Check first few pages for text content
+      const pagesToCheck = Math.min(pdf.numPages, 3);
+      for (let i = 1; i <= pagesToCheck && !hasText; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        if (textContent.items.length > 0) {
+          hasText = true;
+        }
+      }
+      setIsImagePdf(!hasText);
+      if (!hasText) {
+        toast({
+          title: 'Image-only PDF detected',
+          description: 'This PDF contains only images without text. Text highlighting will not work, but you can still view and download it.',
+          status: 'info',
+          duration: 6000,
+          isClosable: true
+        });
+      }
+    } catch (err) {
+      console.warn('Could not analyze PDF text content:', err);
+    }
+
+  }, [toast]);
 
 
 
@@ -515,11 +622,20 @@ export default function Editor() {
 
               </Button>
 
-              <Button colorScheme="teal" onClick={() => setIsHighlightMode((prev) => !prev)}>
+              <Tooltip label={isImagePdf ? 'Highlighting is not available for image-only PDFs' : ''} isDisabled={!isImagePdf}>
 
-                {isHighlightMode ? 'Exit Highlight Mode' : 'Highlight Text'}
+                <Button
+                  colorScheme="teal"
+                  onClick={() => setIsHighlightMode((prev) => !prev)}
+                  isDisabled={isImagePdf}
+                  opacity={isImagePdf ? 0.5 : 1}
+                >
 
-              </Button>
+                  {isHighlightMode ? 'Exit Highlight Mode' : 'Highlight Text'}
+
+                </Button>
+
+              </Tooltip>
 
             </HStack>
 
@@ -545,15 +661,19 @@ export default function Editor() {
 
               <Box borderRadius="2xl" borderWidth="1px" borderColor="gray.800" overflow="hidden" bg="blackAlpha.300">
 
-                <Worker workerUrl={workerUrl}>
+                <PdfErrorBoundary onError={(err) => setViewerError(err.message)}>
 
-                  <Box height={{ base: '80vh', xl: '82vh' }}>
+                  <Worker workerUrl={workerUrl}>
 
-                    <Viewer fileUrl={viewerUrl} plugins={viewerPlugins} />
+                    <Box height={{ base: '80vh', xl: '82vh' }}>
 
-                  </Box>
+                      <Viewer fileUrl={viewerUrl} plugins={viewerPlugins} />
 
-                </Worker>
+                    </Box>
+
+                  </Worker>
+
+                </PdfErrorBoundary>
 
               </Box>
 
@@ -578,6 +698,28 @@ export default function Editor() {
                     <>
 
                       <Text color="gray.300">{file.name}</Text>
+
+                      {isImagePdf && (
+
+                        <Alert status="warning" variant="subtle" borderRadius="md" size="sm">
+
+                          <AlertIcon />
+
+                          <Box>
+
+                            <AlertTitle fontSize="sm">Image-only PDF</AlertTitle>
+
+                            <AlertDescription fontSize="xs">
+
+                              This PDF contains no text layer. Text highlighting is disabled.
+
+                            </AlertDescription>
+
+                          </Box>
+
+                        </Alert>
+
+                      )}
 
                       <Stat>
 
