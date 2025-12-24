@@ -423,17 +423,9 @@ export default function Editor() {
 
 
   useEffect(() => {
-
     // Don't enable text selection trigger for image-only PDFs
-    if (isImagePdf) {
-      highlightPluginInstance?.switchTrigger(Trigger.None);
-      if (isHighlightMode) {
-        setIsHighlightMode(false);
-      }
-    } else {
-      highlightPluginInstance?.switchTrigger(isHighlightMode ? Trigger.TextSelection : Trigger.None);
-    }
-
+    const trigger = (isImagePdf || !isHighlightMode) ? Trigger.None : Trigger.TextSelection;
+    highlightPluginInstance?.switchTrigger(trigger);
   }, [highlightPluginInstance, isHighlightMode, isImagePdf]);
 
 
