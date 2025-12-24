@@ -80,7 +80,26 @@ const workerUrl = '/pdf.worker.min.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-
+// Send errors to API for terminal logging
+const reportError = async (error: Error, component?: string) => {
+  try {
+    await fetch(`${API_URL}/log/error`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: error.message,
+        stack: error.stack,
+        component: component || 'Editor',
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (e) {
+    // Silently fail if error reporting fails
+    console.warn('Failed to report error to API:', e);
+  }
+};
 
 // Error boundary to catch PDF viewer crashes
 
@@ -107,6 +126,7 @@ class PdfErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 
   componentDidCatch(error: Error) {
     console.error('PDF Viewer Error:', error);
+    reportError(error, 'PdfErrorBoundary');
     this.props.onError?.(error);
   }
 
@@ -252,6 +272,30 @@ export default function Editor() {
     highlightsRef.current = highlights;
 
   }, [highlights]);
+
+  // Global error handler to catch unhandled errors and send to API terminal
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      const error = new Error(event.message);
+      error.stack = `at ${event.filename}:${event.lineno}:${event.colno}`;
+      reportError(error, 'GlobalErrorHandler');
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const error = event.reason instanceof Error
+        ? event.reason
+        : new Error(String(event.reason));
+      reportError(error, 'UnhandledPromiseRejection');
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
 
 
 

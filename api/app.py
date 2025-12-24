@@ -1,8 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from typing import List, Optional
-import os, io, zipfile, uuid, json
+import os, io, zipfile, uuid, json, sys
+from datetime import datetime
 from utils import safe_tempfile, parse_page_ranges
 from security import encrypt_pdf_bytes, unlock_pdf_bytes, strip_metadata_pdf_bytes
 from pypdf import PdfReader, PdfWriter
@@ -10,6 +12,14 @@ from pypdf.generic import ArrayObject, FloatObject, DictionaryObject, NameObject
 from watermark import add_text_watermark_pdf_bytes, add_image_watermark_pdf_bytes
 from compression import compress_pdf_bytes
 from editing import replace_text_preserving_style
+
+# ANSI color codes for terminal output
+class Colors:
+    RED = '\033[91m'
+    YELLOW = '\033[93m'
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
 
 app = FastAPI(title="LightPDF-style API", version="0.1.0")
 
@@ -24,6 +34,46 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"ok": True}
+
+# Error logging model and endpoint
+class ClientError(BaseModel):
+    message: str
+    stack: Optional[str] = None
+    component: Optional[str] = None
+    url: Optional[str] = None
+    userAgent: Optional[str] = None
+    timestamp: Optional[str] = None
+
+@app.post("/log/error")
+async def log_client_error(error: ClientError):
+    """
+    Receives errors from the browser and logs them to the terminal.
+    This makes debugging much easier as you can see client errors in the API console.
+    """
+    timestamp = error.timestamp or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Print formatted error to terminal
+    print(f"\n{Colors.RED}{Colors.BOLD}{'='*60}", file=sys.stderr)
+    print(f"🚨 CLIENT ERROR - {timestamp}", file=sys.stderr)
+    print(f"{'='*60}{Colors.RESET}", file=sys.stderr)
+
+    if error.component:
+        print(f"{Colors.CYAN}Component:{Colors.RESET} {error.component}", file=sys.stderr)
+    if error.url:
+        print(f"{Colors.CYAN}URL:{Colors.RESET} {error.url}", file=sys.stderr)
+
+    print(f"{Colors.YELLOW}Message:{Colors.RESET} {error.message}", file=sys.stderr)
+
+    if error.stack:
+        print(f"{Colors.CYAN}Stack Trace:{Colors.RESET}", file=sys.stderr)
+        # Indent the stack trace for readability
+        for line in error.stack.split('\n'):
+            print(f"  {line}", file=sys.stderr)
+
+    print(f"{Colors.RED}{'='*60}{Colors.RESET}\n", file=sys.stderr)
+    sys.stderr.flush()
+
+    return {"logged": True}
 
 @app.post("/merge")
 async def merge_pdfs(files: List[UploadFile] = File(...)):
