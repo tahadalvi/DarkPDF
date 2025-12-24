@@ -110,18 +110,19 @@ def main():
     print(f"  Created: icon.png")
 
     # Generate Windows .ico file (contains multiple sizes)
+    # ICO must include 256x256 for Windows requirements
     ico_path = os.path.join(assets_dir, 'icon.ico')
-    ico_sizes = [16, 32, 48, 256]
+    ico_sizes = [256, 128, 64, 48, 32, 16]  # Largest first
     ico_images = [png_images[s] for s in ico_sizes]
 
-    # Save as ICO
-    ico_images[0].save(
+    # Save as ICO - use the 256x256 as base
+    png_images[256].save(
         ico_path,
         format='ICO',
         sizes=[(s, s) for s in ico_sizes],
-        append_images=ico_images[1:]
+        append_images=[png_images[s] for s in ico_sizes[1:]]
     )
-    print(f"  Created: icon.ico")
+    print(f"  Created: icon.ico (with 256x256)")
 
     # Generate macOS .icns would require additional tools
     # For now, just note that icon.png can be used
