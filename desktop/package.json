@@ -10,9 +10,7 @@
     "build": "electron-builder --win",
     "build:dir": "electron-builder --win --dir"
   },
-  "dependencies": {
-    "electron-is-dev": "^2.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1"

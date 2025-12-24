@@ -4,10 +4,7 @@ const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling
-if (require('electron-squirrel-startup')) {
-  app.quit();
-}
+// Note: Using NSIS installer, not Squirrel - no squirrel-startup needed
 
 let mainWindow = null;
 let tray = null;
