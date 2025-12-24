@@ -360,3 +360,9 @@ async def edit_replace_text(
             "Content-Disposition": f"attachment; filename=edited-{uuid.uuid4().hex[:8]}.pdf"
         },
     )
+
+
+# Entry point for running as standalone executable
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

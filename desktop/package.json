@@ -1,0 +1,66 @@
+{
+  "name": "darkpdf",
+  "version": "1.0.0",
+  "description": "DarkPDF - PDF manipulation toolkit for Windows",
+  "main": "main.js",
+  "author": "DarkPDF",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:dir": "electron-builder --win --dir"
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.darkpdf.app",
+    "productName": "DarkPDF",
+    "copyright": "Copyright © 2024 DarkPDF",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "api/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../build/api",
+        "to": "api",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../build/web",
+        "to": "web",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DarkPDF"
+    }
+  }
+}
