@@ -354,14 +354,7 @@ export default function Editor() {
 
 
 
-  const highlightPluginInstance = useMemo<HighlightPlugin | undefined>(() => {
-
-    if (typeof window === 'undefined') {
-
-      return undefined;
-
-    }
-
+  const highlightPluginInstance = useMemo<HighlightPlugin>(() => {
     return highlightPlugin({
 
       renderHighlightTarget: (props) => (
@@ -469,7 +462,7 @@ export default function Editor() {
   useEffect(() => {
     // Don't enable text selection trigger for image-only PDFs
     const trigger = (isImagePdf || !isHighlightMode) ? Trigger.None : Trigger.TextSelection;
-    highlightPluginInstance?.switchTrigger(trigger);
+    highlightPluginInstance.switchTrigger(trigger);
   }, [highlightPluginInstance, isHighlightMode, isImagePdf]);
 
 
